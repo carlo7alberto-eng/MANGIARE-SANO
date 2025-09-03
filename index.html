@@ -1,1 +1,382 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>Cibo Sano AI — PWA</title>
+
+  <!-- PWA manifest -->
+  <link rel="manifest" href="manifest.json">
+
+  <!-- Icone per i dispositivi Apple (opzionali) -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Cibo Sano AI">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+
+  <style>
+    :root{
+      --bg:#0f172a; --card:#0b1220; --text:#e5e7eb; --muted:#94a3b8; --accent:#22c55e;
+    }
+    *{box-sizing:border-box}
+    body{margin:0; font-family:system-ui,Segoe UI,Roboto,Arial; background:linear-gradient(180deg,#071024,#0f172a); color:var(--text); padding:18px;}
+    .wrap{max-width:980px;margin:0 auto}
+    header{display:flex;gap:12px;align-items:center}
+    h1{margin:0;font-size:20px}
+    .card{background:linear-gradient(180deg,rgba(255,255,255,.02),rgba(255,255,255,.01));border:1px solid rgba(255,255,255,.04);padding:14px;border-radius:12px;margin-top:14px}
+    video{width:100%;border-radius:10px;background:#000}
+    .kvs{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+    input,select,button{padding:8px;border-radius:10px;border:1px solid rgba(255,255,255,.06);background:rgba(255,255,255,.02);color:var(--text)}
+    button.primary{background:var(--accent);border:0;color:#042814;font-weight:700}
+    .pill{display:inline-block;padding:6px 10px;border-radius:999px;background:rgba(255,255,255,.03);margin:6px 6px 0 0;font-size:13px}
+    .history-item{border-bottom:1px dashed rgba(255,255,255,.04);padding:8px 0;font-size:14px}
+    footer{margin-top:20px;color:var(--muted);font-size:13px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none"><path d="M4 8c0-1.657 1.343-3 3-3h10c1.657 0 3 1.343 3 3v8c0 1.657-1.343 3-3 3H7c-1.657 0-3-1.343-3-3V8Z" stroke="#22c55e" stroke-width="1.5"/><path d="M7 9h10M7 12h4" stroke="#22c55e" stroke-width="1.5"/></svg>
+      <h1>Cibo Sano AI — PWA (MVP)</h1>
+    </header>
+
+    <section class="card">
+      <h2>Profilo utente</h2>
+      <label>Obiettivo principale:
+        <select id="goal">
+          <option value="generale">Generale</option>
+          <option value="sportivo">Sportivo</option>
+          <option value="dimagrimento">Dimagrimento</option>
+          <option value="ipertensione">Ipertensione</option>
+        </select>
+      </label>
+    </section>
+
+    <div class="card">
+      <h2>Scansione codice a barre</h2>
+      <div style="margin-bottom:8px">
+        <button id="btnStart" class="primary">Avvia fotocamera</button>
+        <button id="btnStop">Ferma</button>
+        <span id="scanStatus" style="margin-left:10px;color:var(--muted)">In attesa…</span>
+      </div>
+      <video id="video" playsinline></video>
+      <div style="margin-top:10px">Ultimo barcode: <span id="barcode" class="pill">—</span></div>
+      <div id="scanError" style="color:#fecaca;margin-top:6px"></div>
+    </div>
+
+    <div class="card">
+      <h2>Inserimento manuale (per 100g/ml)</h2>
+      <div class="kvs">
+        <div><label>Energia (kcal)<br><input id="kcal" type="number" step="0.1" placeholder="es. 160"></label></div>
+        <div><label>Zuccheri (g)<br><input id="sugars" type="number" step="0.1" placeholder="es. 12"></label></div>
+        <div><label>Grassi saturi (g)<br><input id="satfat" type="number" step="0.1" placeholder="es. 3.5"></label></div>
+        <div><label>Sodio (mg)<br><input id="sodium" type="number" step="1" placeholder="es. 300"></label></div>
+        <div><label>Fibre (g)<br><input id="fiber" type="number" step="0.1" placeholder="es. 5"></label></div>
+        <div><label>Proteine (g)<br><input id="protein" type="number" step="0.1" placeholder="es. 8"></label></div>
+        <div><label>Carboidrati (g)<br><input id="carbs" type="number" step="0.1" placeholder="opzionale"></label></div>
+        <div><label>Nome prodotto<br><input id="manualName" type="text" placeholder="opzionale"></label></div>
+      </div>
+      <div style="margin-top:10px"><button id="btnAnalyzeManual" class="primary">Analizza valori</button></div>
+    </div>
+
+    <section class="card">
+      <h2>Risultato</h2>
+      <div>Prodotto: <span id="prodName" class="pill">—</span> Marca: <span id="prodBrand" class="pill">—</span></div>
+      <div style="margin-top:10px">Indice di Salute: <b id="scoreText">—</b></div>
+      <div style="height:12px;background:rgba(255,255,255,.04);border-radius:999px;margin-top:8px;overflow:hidden">
+        <div id="scoreBar" style="height:100%;width:0%;background:linear-gradient(90deg,#ef4444,#f59e0b,#22c55e);transition:width .6s"></div>
+      </div>
+      <div style="margin-top:8px">Frequenza consigliata: <b id="freqText">—</b></div>
+
+      <div style="margin-top:12px">Motivazioni: <div id="badges"></div></div>
+      <div style="margin-top:12px">Abbinamenti suggeriti: <div id="pairings"></div></div>
+
+      <details style="margin-top:12px"><summary class="muted">Dettagli nutrizionali (per 100g/ml)</summary>
+        <div id="nutriDetails" class="kvs" style="margin-top:8px"></div>
+      </details>
+
+      <div id="apiError" style="color:#fecaca;margin-top:10px"></div>
+    </section>
+
+    <section class="card">
+      <h2>Cronologia (ultime 10)</h2>
+      <div id="history"></div>
+      <div style="margin-top:8px"><button id="clearHistory">Cancella cronologia</button></div>
+    </section>
+
+    <footer>
+      *Questo MVP salva i dati solo sul dispositivo (localStorage). Non è un parere medico.*
+    </footer>
+  </div>
+
+  <!-- ZXing scanner ESM -->
+  <script type="module">
+    import { BrowserMultiFormatReader } from 'https://unpkg.com/@zxing/browser@latest?module';
+
+    const video = document.getElementById('video');
+    const cameraSelect = null;
+    const btnStart = document.getElementById('btnStart');
+    const btnStop = document.getElementById('btnStop');
+    const scanStatus = document.getElementById('scanStatus');
+    const scanError = document.getElementById('scanError');
+    const barcodeSpan = document.getElementById('barcode');
+
+    const prodName = document.getElementById('prodName');
+    const prodBrand = document.getElementById('prodBrand');
+    const scoreText = document.getElementById('scoreText');
+    const scoreBar = document.getElementById('scoreBar');
+    const freqText = document.getElementById('freqText');
+    const badges = document.getElementById('badges');
+    const pairings = document.getElementById('pairings');
+    const nutriDetails = document.getElementById('nutriDetails');
+    const apiError = document.getElementById('apiError');
+
+    const kcalIn = document.getElementById('kcal');
+    const sugarsIn = document.getElementById('sugars');
+    const satfatIn = document.getElementById('satfat');
+    const sodiumIn = document.getElementById('sodium');
+    const fiberIn = document.getElementById('fiber');
+    const proteinIn = document.getElementById('protein');
+    const carbsIn = document.getElementById('carbs');
+    const manualNameIn = document.getElementById('manualName');
+    const btnAnalyzeManual = document.getElementById('btnAnalyzeManual');
+
+    const codeReader = new BrowserMultiFormatReader();
+    let currentDeviceId = null;
+    let stopHandle = null;
+
+    async function listCameras() {
+      try {
+        const devices = await BrowserMultiFormatReader.listVideoInputDevices();
+        if (devices && devices.length) currentDeviceId = devices[0].deviceId;
+      } catch(e) { console.warn(e); }
+    }
+
+    async function start() {
+      apiError.textContent = '';
+      scanError.textContent = '';
+      scanStatus.textContent = 'Avvio fotocamera…';
+      await listCameras();
+      try {
+        stop();
+        const controls = await codeReader.decodeFromVideoDevice(currentDeviceId, video, (result, err) => {
+          if (result) {
+            const code = result.getText();
+            barcodeSpan.textContent = code;
+            scanStatus.textContent = 'Trovato: ' + code;
+            stop();
+            fetchProduct(code);
+          }
+          if (err && !(err?.name?.includes('NotFoundException'))) {
+            // ignora gli errori non fatali
+          }
+        });
+        stopHandle = controls;
+        scanStatus.textContent = 'Inquadratura attiva: punta il barcode nel riquadro.';
+      } catch (e) {
+        scanError.textContent = 'Impossibile avviare la fotocamera. Controlla permessi e HTTPS.';
+        console.error(e);
+      }
+    }
+
+    function stop() {
+      if (stopHandle) { stopHandle.stop(); stopHandle = null; }
+      scanStatus.textContent = 'In attesa…';
+    }
+
+    btnStart.addEventListener('click', start);
+    btnStop.addEventListener('click', stop);
+
+    async function fetchProduct(code) {
+      apiError.textContent = '';
+      badges.innerHTML = '';
+      pairings.innerHTML = '';
+      nutriDetails.innerHTML = '';
+      prodName.textContent = '—';
+      prodBrand.textContent = '—';
+      updateScore(null);
+
+      try {
+        const url = `https://world.openfoodfacts.org/api/v2/product/${code}.json`;
+        const res = await fetch(url);
+        const data = await res.json();
+        if (!data || data.status !== 1 || !data.product) {
+          apiError.textContent = 'Prodotto non trovato. Inserisci i valori manualmente.';
+          return;
+        }
+        const p = data.product;
+        prodName.textContent = p.product_name || p.generic_name || 'Senza nome';
+        prodBrand.textContent = (p.brands || '—').split(',')[0];
+
+        const n = p.nutriments || {};
+        const kcal = pickNumber(n['energy-kcal_100g'], kjToKcal(n['energy_100g']));
+        const sugars = pickNumber(n['sugars_100g']);
+        const satfat = pickNumber(n['saturated-fat_100g']);
+        const sodiumMg = gramsToMg(pickNumber(n['sodium_100g'], saltToSodium(n['salt_100g'])));
+        const fiber = pickNumber(n['fiber_100g']);
+        const protein = pickNumber(n['proteins_100g']);
+        const carbs = pickNumber(n['carbohydrates_100g']);
+
+        analyzeAndRender({ kcal, sugars, satfat, sodiumMg, fiber, protein, carbs });
+      } catch (e) {
+        console.error(e);
+        apiError.textContent = 'Errore di rete. Riprova o usa l\\'inserimento manuale.';
+      }
+    }
+
+    function analyzeAndRender({ kcal, sugars, satfat, sodiumMg, fiber, protein, carbs }) {
+      const details = [
+        ['Energia (kcal)', kcal],
+        ['Zuccheri (g)', sugars],
+        ['Grassi saturi (g)', satfat],
+        ['Sodio (mg)', sodiumMg],
+        ['Fibre (g)', fiber],
+        ['Proteine (g)', protein],
+        ['Carboidrati (g)', carbs]
+      ];
+      nutriDetails.innerHTML = '';
+      details.forEach(([k, v]) => {
+        const d = document.createElement('div');
+        d.textContent = `${k}: ${fmt(v)}`;
+        nutriDetails.appendChild(d);
+      });
+
+      const goal = document.getElementById('goal').value;
+      const { score, reasons } = healthScore({ kcal, sugars, satfat, sodiumMg, fiber, protein }, goal);
+      updateScore(score);
+      badges.innerHTML = '';
+      reasons.forEach(r => addPill(r, badges));
+
+      const freq = frequencyAdvice(score);
+      freqText.textContent = freq;
+
+      const pair = pairingAdvice({ sugars, satfat, sodiumMg, fiber, protein, carbs });
+      pairings.innerHTML = '';
+      pair.forEach(p => addPill(p, pairings));
+
+      saveHistory(prodName.textContent || manualNameIn.value || 'Senza nome', score, freq);
+    }
+
+    function healthScore({ kcal, sugars, satfat, sodiumMg, fiber, protein }, goal='generale') {
+      let score = 100;
+      const reasons = [];
+
+      if (isNum(kcal)) { const pen = Math.max(0, (kcal - 150) / 5); score -= pen; if (pen>0) reasons.push('alta densità energetica'); }
+      if (isNum(sugars)) { const pen = Math.min(40, sugars * 2); score -= pen; if (sugars>10) reasons.push('zuccheri elevati'); }
+      if (isNum(satfat)) { const pen = Math.min(30, satfat * 3); score -= pen; if (satfat>5) reasons.push('molti saturi'); }
+      if (isNum(sodiumMg)) { const pen = Math.min(25, sodiumMg / 100); score -= pen; if (sodiumMg>400) reasons.push('sodio alto'); }
+
+      if (isNum(fiber)) { const bonus = Math.min(10, fiber * 2); score += bonus; if (fiber>=3) reasons.push('buon apporto fibre'); }
+      if (isNum(protein)) { const bonus = Math.min(10, Math.max(0, protein - 5)); score += bonus; if (protein>=10) reasons.push('buon apporto proteine'); }
+
+      // personalizzazione semplice in base all'obiettivo
+      if (goal === 'sportivo' && isNum(protein)) { score += Math.min(10, protein * 1.5); reasons.push('obiettivo sportivo: proteine valorizzate'); }
+      if (goal === 'dimagrimento' && isNum(kcal) && kcal>200) { score -= 8; reasons.push('obiettivo dimagrimento: kcal penalizzate'); }
+      if (goal === 'ipertensione' && isNum(sodiumMg) && sodiumMg>300) { score -= 10; reasons.push('obiettivo ipertensione: sodio penalizzato'); }
+
+      score = Math.max(0, Math.min(100, Math.round(score)));
+      return { score, reasons };
+    }
+
+    function frequencyAdvice(score) {
+      if (score == null) return '—';
+      if (score >= 85) return 'ok anche tutti i giorni (porzioni adeguate)';
+      if (score >= 70) return 'fino a 5–7 volte/settimana';
+      if (score >= 50) return '2–4 volte/settimana';
+      if (score >= 30) return 'circa 1 volta/settimana';
+      return 'solo occasionalmente';
+    }
+
+    function pairingAdvice({ sugars, satfat, sodiumMg, fiber, protein, carbs }) {
+      const tips = new Set();
+      if (isNum(sugars) && sugars > 10 && (!isNum(fiber) || fiber < 3)) {
+        tips.add('aggiungi fibre: frutta intera, avena, semi, verdure');
+        tips.add('abbina proteine (es. yogurt greco) per attenuare picchi glicemici');
+      }
+      if (isNum(carbs) && carbs > 25 && (!isNum(protein) || protein < 10)) {
+        tips.add('aggiungi proteine: legumi, uova, tofu, pesce o pollo');
+      }
+      if (isNum(satfat) && satfat > 5) tips.add('scegli proteine magre + molte verdure; limita condimenti');
+      if (isNum(sodiumMg) && sodiumMg > 400) tips.add('completa con contorni senza sale (verdure) e bevi acqua');
+      if (isNum(protein) && protein >= 15 && (!isNum(carbs) || carbs < 15)) tips.add('aggiungi carboidrati complessi: pane integrale, riso');
+      tips.add('includi sempre una quota di verdure o frutta');
+      return Array.from(tips);
+    }
+
+    function updateScore(score) {
+      if (score == null) { scoreText.textContent = '—'; scoreBar.style.width = '0%'; return; }
+      scoreText.textContent = score + '/100';
+      scoreBar.style.width = score + '%';
+    }
+
+    function addPill(text, container) {
+      const span = document.createElement('span');
+      span.className = 'pill';
+      span.textContent = text;
+      (container || badges).appendChild(span);
+    }
+
+    // Utils
+    function fmt(v) { return isNum(v) ? String(Math.round(v * 10) / 10) : 'n/d'; }
+    function isNum(v) { return typeof v === 'number' && isFinite(v); }
+    function pickNumber(...vals) { for (const v of vals) if (isNum(v)) return v; return null; }
+    function gramsToMg(g) { return isNum(g) ? g * 1000 : null; }
+    function saltToSodium(saltG) { return isNum(saltG) ? saltG * 0.4 : null; }
+    function kjToKcal(kj) { return isNum(kj) ? kj * 0.239006 : null; }
+    function numOrNull(v) { const n = Number(v); return isFinite(n) ? n : null; }
+
+    // Analisi manuale
+    btnAnalyzeManual.addEventListener('click', () => {
+      const kcal = numOrNull(kcalIn.value);
+      const sugars = numOrNull(sugarsIn.value);
+      const satfat = numOrNull(satfatIn.value);
+      const sodiumMg = numOrNull(sodiumIn.value);
+      const fiber = numOrNull(fiberIn.value);
+      const protein = numOrNull(proteinIn.value);
+      const carbs = numOrNull(carbsIn.value);
+
+      prodName.textContent = manualNameIn.value || 'Valori manuali';
+      prodBrand.textContent = '—';
+      badges.innerHTML = '';
+      pairings.innerHTML = '';
+      nutriDetails.innerHTML = '';
+      apiError.textContent = '';
+
+      analyzeAndRender({ kcal, sugars, satfat, sodiumMg, fiber, protein, carbs });
+    });
+
+    // LocalStorage history
+    function saveHistory(name, score, freq) {
+      let history = JSON.parse(localStorage.getItem('history')||'[]');
+      history.unshift({name, score, freq, date: new Date().toLocaleString()});
+      if (history.length > 10) history.pop();
+      localStorage.setItem('history', JSON.stringify(history));
+      renderHistory();
+    }
+    function renderHistory() {
+      let history = JSON.parse(localStorage.getItem('history')||'[]');
+      const div = document.getElementById('history');
+      div.innerHTML = '';
+      history.forEach(item => {
+        const el = document.createElement('div');
+        el.className = 'history-item';
+        el.innerHTML = `<strong>${item.name}</strong> — ${item.score}/100 — ${item.freq}<br><small>${item.date}</small>`;
+        div.appendChild(el);
+      });
+    }
+    document.getElementById('clearHistory').addEventListener('click', () => {
+      localStorage.removeItem('history'); renderHistory();
+    });
+    renderHistory();
+
+    // Register service worker (PWA) — will silently fail if sw.js non presente
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').then(() => {
+          console.log('Service Worker registrato');
+        }).catch(e => console.warn('SW registration failed', e));
+      });
+    }
+  </script>
+</body>
+</html>
 
